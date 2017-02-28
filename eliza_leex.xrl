@@ -13,7 +13,7 @@ final   : {token,{final, TokenLine, list_to_atom(TokenChars)}}.
 quit    : {token,{quit, TokenLine, list_to_atom(TokenChars)}}.
 pre     : {token,{pre, TokenLine, list_to_atom(TokenChars)}}.
 post    : {token,{post, TokenLine, list_to_atom(TokenChars)}}.
-synon   : {token,{post, TokenLine, list_to_atom(TokenChars)}}.
+synon   : {token,{synon, TokenLine, list_to_atom(TokenChars)}}.
 key     : {token,{key, TokenLine, list_to_atom(TokenChars)}}.
 decomp  : {token,{decomp, TokenLine, list_to_atom(TokenChars)}}.
 reasmb  : {token,{reasmb, TokenLine, list_to_atom(TokenChars)}}.

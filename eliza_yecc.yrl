@@ -9,26 +9,28 @@ Rootsymbol scripts.
 Endsymbol '$end'.
 
 
-scripts -> script.
-scripts -> script scripts.
-script -> initial split word words.
-script -> final split word words.
-script -> quit split word.
-script -> quit split quit.
-script -> pre split word words.
-script -> post split word words.
-script -> synon split word words.
-script -> key split name priority decom_patterns.
-words -> word.
-words -> word words.
-priority -> '$empty'.
-priority -> number.
-decom_patterns -> decom_pattern.
-decom_patterns -> decom_pattern decom_patterns.
-decom_pattern -> decomp split word  reasemb_patterns.
-decom_pattern -> decomp split word words  reasemb_patterns.
-reasemb_patterns -> reasemb_pattern.
-reasemb_patterns -> reasemb_pattern  reasemb_patterns.
-reasemb_pattern -> reasmb split goto name.
-reasemb_pattern -> reasmb split word words. 
-name -> word.
+scripts -> script:[{script, '$1'}].
+scripts -> script scripts:[{script, '$1'} | '$2'].
+script -> initial split word words:{initial,[value('$3') | '$4']}.
+script -> final split word words:{final, [value('$3') | '$4']}.
+script -> quit split word:{quit, [value('$3')]}.
+script -> quit split quit:{quit, ["quit"]}.
+script -> pre split word words:{pre, value('$3'), '$4'}.
+script -> synon split word words:{synon, value('$3'), '$4'}.
+script -> post split word words:{post, value('$3'), '$4'}.
+script -> key split name priority decom_patterns:{key, '$3','$4','$5'}.
+words -> word:[value('$1')].
+words -> word words:[value('$1') | '$2'].
+priority -> '$empty':0.
+priority -> number:value('$1').
+decom_patterns -> decom_pattern:['$1'].
+decom_patterns -> decom_pattern decom_patterns:['$1' | '$2'].
+decom_pattern -> decomp split word  reasemb_patterns:{decomp, [value('$3')], '$4'}.
+decom_pattern -> decomp split word words  reasemb_patterns:{decomp, [value('$3')|'$4'], '$5'}.
+reasemb_patterns -> reasemb_pattern:['$1'].
+reasemb_patterns -> reasemb_pattern  reasemb_patterns:['$1' | '$2'].
+reasemb_pattern -> reasmb split goto name:{reasmb, goto,'$4'}.
+reasemb_pattern -> reasmb split word words:{reasmb, replace, [value('$3') | '$4']}. 
+name -> word:value('$1').
+Erlang code.
+value(Token) -> element(3,Token).

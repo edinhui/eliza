@@ -81,7 +81,7 @@ compile_and_run() ->
     c:c(eliza_leex),
     c:c(eliza_yecc),
     c:c(eliza),
-    eliza:import_script_verbose("./script").
+    eliza:import_script_verbose("./script_test").
          
                               
 

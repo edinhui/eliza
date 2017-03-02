@@ -1,4 +1,18 @@
 -module(eliza).
+
+-record(script,{value}).
+-record(initial, {init_word_list}).
+-record(final, {final_word_list}).
+-record(quit, {quit_word_list}).
+-record(pre, {orig_word, replace_word_list}).
+-record(post, {orig_word, replace_word_list}).
+-record(synon, {sample, synon_list}).
+-record(key, {keyword, priority, decomp_list}).
+-record(decomp, {pattern, reasmb_index, reasmb_list}).
+-record(reasmb, {rule, value}).
+
+
+
 -export([import_script/1, 
          import_script_verbose/1, 
          get_line_tokens/1,
@@ -83,9 +97,36 @@ compile_and_run() ->
     c:c(eliza),
     eliza:import_script_verbose("./script_test").
          
-                              
+classify_script(ScriptLs) ->
+    classify_script(ScriptLs, undefined,undefined,[],[],[],[],[]).
 
+classify_script([], Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
+    {Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs};
 
+classify_script([#script{value = #initial{}} = Script | Rest], 
+                Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
+    classify_script(Rest, Script, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs);
 
-                
+classify_script([#script{value = #final{}} = Script | Rest], 
+                Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
+    classify_script(Rest, Initial, Script, QuitLs, PreLs, PostLs, SynonLs, KeyLs);
+                                  
+classify_script([#script{value = #quit{}} = Script | Rest], 
+                Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
+    classify_script(Rest, Initial, Final, [Script | QuitLs], PreLs, PostLs, SynonLs, KeyLs);
 
+classify_script([#script{value = #pre{}} = Script | Rest], 
+                Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
+    classify_script(Rest, Initial, Final, QuitLs, [Script | PreLs], PostLs, SynonLs, KeyLs);
+
+classify_script([#script{value = #post{}} = Script | Rest], 
+                Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
+    classify_script(Rest, Initial, Final, QuitLs, PreLs, [Script | PostLs], SynonLs, KeyLs);
+
+classify_script([#script{value = #synon{}} = Script | Rest], 
+                Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
+    classify_script(Rest, Initial, Final, QuitLs, PreLs, PostLs, [Script | SynonLs], KeyLs);
+
+classify_script([#script{value = #key{}} = Script | Rest], 
+                Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
+    classify_script(Rest, Initial, Final, QuitLs, PreLs, PostLs, SynonLs, [Script | KeyLs]).

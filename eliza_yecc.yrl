@@ -8,7 +8,17 @@ word split initial final quit pre post synon key decomp reasmb number goto.
 Rootsymbol scripts.
 Endsymbol '$end'.
 
-
+%-record(script,{value}).
+%-record(initial, {init_word_list}).
+%-record(final, {final_word_list}).
+%-record(quit, {quit_word_list}).
+%-record(pre, {orig_word, replace_word_list}).
+%-record(post, {orig_word, replace_word_list}).
+%-record(synon, {sample, synon_list}).
+%-record(key, {keyword, priority, decomp_list}).
+%-record(decomp, {pattern, reasmb_index, reasmb_list}).
+%-record(reasmb, {rule, value}).
+% the returned types are defined as above.
 scripts -> script:[{script, '$1'}].
 scripts -> script scripts:[{script, '$1'} | '$2'].
 script -> initial split word words:{initial,[value('$3') | '$4']}.
@@ -25,8 +35,8 @@ priority -> '$empty':0.
 priority -> number:value('$1').
 decom_patterns -> decom_pattern:['$1'].
 decom_patterns -> decom_pattern decom_patterns:['$1' | '$2'].
-decom_pattern -> decomp split word  reasemb_patterns:{decomp, [value('$3')], '$4'}.
-decom_pattern -> decomp split word words  reasemb_patterns:{decomp, [value('$3')|'$4'], '$5'}.
+decom_pattern -> decomp split word  reasemb_patterns:{decomp, [value('$3')], 0, '$4'}.
+decom_pattern -> decomp split word words  reasemb_patterns:{decomp, [value('$3')|'$4'], 0, '$5'}.
 reasemb_patterns -> reasemb_pattern:['$1'].
 reasemb_patterns -> reasemb_pattern  reasemb_patterns:['$1' | '$2'].
 reasemb_pattern -> reasmb split goto name:{reasmb, goto,'$4'}.

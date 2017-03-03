@@ -13,11 +13,12 @@
 
 
 
--export([import_script/1, 
-         import_script_verbose/1, 
-         get_line_tokens/1,
-         compile_and_run/0]).
+%-export([import_script/1, 
+%         import_script_verbose/1, 
+%         get_line_tokens/1,
+%         compile_and_run/0]).
 
+-compile(export_all).
 
 import_script(FullPath) ->
     case get_tokens(FullPath) of
@@ -130,3 +131,24 @@ classify_script([#script{value = #synon{}} = Script | Rest],
 classify_script([#script{value = #key{}} = Script | Rest], 
                 Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
     classify_script(Rest, Initial, Final, QuitLs, PreLs, PostLs, SynonLs, [Script | KeyLs]).
+
+convert_decomp_pattern_to_perl_style(#decomp{pattern = Pattern}) ->
+    ok.
+
+replace_star($*, Acc) ->
+    Acc++"(.*)";
+replace_star(Other, Acc) ->
+    Acc ++ [Other].
+
+
+replace_synon([], SynonLs) ->
+    [];
+replace_synon([$@],SynonLs) ->
+    [$@]; 
+replace_synon([$@|Rest] = Old, SynonLs) ->
+    case lists:keysearch(Rest, 2, SynonLs) of
+         false -> Old;
+         {value, #synon{sample = Rest, synon_list = Synons}} ->
+             "(" ++ string:join([Rest|Synons],"|") ++ ")"
+    end. 
+    

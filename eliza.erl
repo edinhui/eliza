@@ -104,37 +104,40 @@ classify_script(ScriptLs) ->
 classify_script([], Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
     {Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs};
 
-classify_script([#script{value = #initial{}} = Script | Rest], 
+classify_script([#script{value = #initial{} = Init} = Script | Rest], 
                 Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
-    classify_script(Rest, Script, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs);
+    classify_script(Rest, Init, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs);
 
-classify_script([#script{value = #final{}} = Script | Rest], 
+classify_script([#script{value = #final{} = Fin} = Script | Rest], 
                 Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
-    classify_script(Rest, Initial, Script, QuitLs, PreLs, PostLs, SynonLs, KeyLs);
+    classify_script(Rest, Initial, Fin, QuitLs, PreLs, PostLs, SynonLs, KeyLs);
                                   
-classify_script([#script{value = #quit{}} = Script | Rest], 
+classify_script([#script{value = #quit{} = Qt} = Script | Rest], 
                 Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
-    classify_script(Rest, Initial, Final, [Script | QuitLs], PreLs, PostLs, SynonLs, KeyLs);
+    classify_script(Rest, Initial, Final, [Qt | QuitLs], PreLs, PostLs, SynonLs, KeyLs);
 
-classify_script([#script{value = #pre{}} = Script | Rest], 
+classify_script([#script{value = #pre{} = Pre} = Script | Rest], 
                 Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
-    classify_script(Rest, Initial, Final, QuitLs, [Script | PreLs], PostLs, SynonLs, KeyLs);
+    classify_script(Rest, Initial, Final, QuitLs, [Pre | PreLs], PostLs, SynonLs, KeyLs);
 
-classify_script([#script{value = #post{}} = Script | Rest], 
+classify_script([#script{value = #post{} = Post} = Script | Rest], 
                 Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
-    classify_script(Rest, Initial, Final, QuitLs, PreLs, [Script | PostLs], SynonLs, KeyLs);
+    classify_script(Rest, Initial, Final, QuitLs, PreLs, [Post | PostLs], SynonLs, KeyLs);
 
-classify_script([#script{value = #synon{}} = Script | Rest], 
+classify_script([#script{value = #synon{} = Synon} = Script | Rest], 
                 Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
-    classify_script(Rest, Initial, Final, QuitLs, PreLs, PostLs, [Script | SynonLs], KeyLs);
+    classify_script(Rest, Initial, Final, QuitLs, PreLs, PostLs, [Synon | SynonLs], KeyLs);
 
-classify_script([#script{value = #key{}} = Script | Rest], 
+classify_script([#script{value = #key{} = Key} = Script | Rest], 
                 Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
-    classify_script(Rest, Initial, Final, QuitLs, PreLs, PostLs, SynonLs, [Script | KeyLs]).
+    classify_script(Rest, Initial, Final, QuitLs, PreLs, PostLs, SynonLs, [Key | KeyLs]).
 
-convert_decomp_pattern_to_perl_style(#decomp{pattern = Pattern}) ->
-    ok.
-
+convert_decomp_pattern_to_perl_style(#decomp{pattern = Pattern} = Decomp, SynonLs) ->
+    PatternStar = lists:map(fun(Word) -> lists:foldl(fun replace_star/2, [], Word) end,
+                            Pattern),
+    PatternSynon = lists:map(fun(Word) -> replace_synon(Word, SynonLs) end, PatternStar),
+    Decomp#decomp{pattern = PatternSynon}.
+ 
 replace_star($*, Acc) ->
     Acc++"(.*)";
 replace_star(Other, Acc) ->
@@ -150,5 +153,24 @@ replace_synon([$@|Rest] = Old, SynonLs) ->
          false -> Old;
          {value, #synon{sample = Rest, synon_list = Synons}} ->
              "(" ++ string:join([Rest|Synons],"|") ++ ")"
-    end. 
+    end; 
+replace_synon(Other, SynonLs) ->
+    Other.
+
+extract_and_init_script(ScriptLs) ->
+    {Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs} = 
+        classify_script(ScriptLs),
+    {Initial, Final, QuitLs, PreLs, PostLs, SynonLs,
+     lists:map(fun(Key) -> pre_process_key(Key, SynonLs) end, KeyLs)}.
+
+pre_process_key(#key{decomp_list = DecompLs} = Key, SynonLs) ->
+    DecompLs1 = lists:map(fun(Decomp) -> convert_decomp_pattern_to_perl_style(Decomp, SynonLs) end,
+                          DecompLs),
+    DecompLs2 = lists:map(fun(Old) -> Old#decomp{reasmb_index = 1} end, DecompLs1),
+    Key#key{decomp_list = DecompLs1}.
     
+init_eliza(FullPath) ->
+    case import_script(FullPath) of
+        {ok, ScriptLs} -> extract_and_init_script(ScriptLs);
+        Err -> Err
+    end.   

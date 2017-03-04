@@ -14,6 +14,7 @@
 -define(XNONE, "xnone").
 -define(VAR, "\([0-9]\)").
 -define(OPTIONS, [global,{capture, all_but_first, list}]).
+-define(SEP, " ,\n").
 %-export([import_script/1, 
 %         import_script_verbose/1, 
 %         get_line_tokens/1,
@@ -189,7 +190,7 @@ talking() ->
 
 talking_loop(Final, QuitLs, PreLs, PostLs, KeyLs) ->
     Sentence = read(),
-    Words = string:tokens(Sentence, " \n"),
+    Words = string:tokens(Sentence, ?SEP),
     case quit_check(Words, QuitLs) of
         true -> 
             write_words(Final#final.final_word_list),
@@ -305,7 +306,7 @@ replace_var_loop([Word|Rest], Captured, PostLs, NewWordLs) ->
             {match,[[CapIdxStr]]} -> 
                 {CapIdx,_} = string:to_integer(CapIdxStr),
                 [MatchStr] = lists:nth(CapIdx, Captured),
-                MatchWordLs = string:tokens(MatchStr, " "),
+                MatchWordLs = string:tokens(MatchStr, ?SEP),
                 PostSub = substitution(MatchWordLs, PostLs),
                 NewWordLs ++ PostSub;
             nomatch -> 

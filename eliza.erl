@@ -11,8 +11,9 @@
 -record(decomp, {pattern, reasmb_index, reasmb_list}).
 -record(reasmb, {rule, value}).
 
-
-
+-define(XNONE, "xnone").
+-define(VAR, "\([0-9]\)").
+-define(OPTIONS, [global,{capture, all_but_first, list}]).
 %-export([import_script/1, 
 %         import_script_verbose/1, 
 %         get_line_tokens/1,
@@ -104,31 +105,31 @@ classify_script(ScriptLs) ->
 classify_script([], Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
     {Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs};
 
-classify_script([#script{value = #initial{} = Init} = Script | Rest], 
-                Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
+classify_script([#script{value = #initial{} = Init} | Rest], 
+                _Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
     classify_script(Rest, Init, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs);
 
-classify_script([#script{value = #final{} = Fin} = Script | Rest], 
-                Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
+classify_script([#script{value = #final{} = Fin} | Rest], 
+                Initial, _Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
     classify_script(Rest, Initial, Fin, QuitLs, PreLs, PostLs, SynonLs, KeyLs);
                                   
-classify_script([#script{value = #quit{} = Qt} = Script | Rest], 
+classify_script([#script{value = #quit{} = Qt} | Rest], 
                 Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
     classify_script(Rest, Initial, Final, [Qt | QuitLs], PreLs, PostLs, SynonLs, KeyLs);
 
-classify_script([#script{value = #pre{} = Pre} = Script | Rest], 
+classify_script([#script{value = #pre{} = Pre} | Rest], 
                 Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
     classify_script(Rest, Initial, Final, QuitLs, [Pre | PreLs], PostLs, SynonLs, KeyLs);
 
-classify_script([#script{value = #post{} = Post} = Script | Rest], 
+classify_script([#script{value = #post{} = Post} | Rest], 
                 Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
     classify_script(Rest, Initial, Final, QuitLs, PreLs, [Post | PostLs], SynonLs, KeyLs);
 
-classify_script([#script{value = #synon{} = Synon} = Script | Rest], 
+classify_script([#script{value = #synon{} = Synon} | Rest], 
                 Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
     classify_script(Rest, Initial, Final, QuitLs, PreLs, PostLs, [Synon | SynonLs], KeyLs);
 
-classify_script([#script{value = #key{} = Key} = Script | Rest], 
+classify_script([#script{value = #key{} = Key} | Rest], 
                 Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
     classify_script(Rest, Initial, Final, QuitLs, PreLs, PostLs, SynonLs, [Key | KeyLs]).
 
@@ -144,9 +145,9 @@ replace_star(Other, Acc) ->
     Acc ++ [Other].
 
 
-replace_synon([], SynonLs) ->
+replace_synon([], _SynonLs) ->
     [];
-replace_synon([$@],SynonLs) ->
+replace_synon([$@], _SynonLs) ->
     [$@]; 
 replace_synon([$@|Rest] = Old, SynonLs) ->
     case lists:keysearch(Rest, 2, SynonLs) of
@@ -154,7 +155,7 @@ replace_synon([$@|Rest] = Old, SynonLs) ->
          {value, #synon{sample = Rest, synon_list = Synons}} ->
              "(" ++ string:join([Rest|Synons],"|") ++ ")"
     end; 
-replace_synon(Other, SynonLs) ->
+replace_synon(Other, _SynonLs) ->
     Other.
 
 extract_and_init_script(ScriptLs) ->
@@ -167,10 +168,150 @@ pre_process_key(#key{decomp_list = DecompLs} = Key, SynonLs) ->
     DecompLs1 = lists:map(fun(Decomp) -> convert_decomp_pattern_to_perl_style(Decomp, SynonLs) end,
                           DecompLs),
     DecompLs2 = lists:map(fun(Old) -> Old#decomp{reasmb_index = 1} end, DecompLs1),
-    Key#key{decomp_list = DecompLs1}.
+    Key#key{decomp_list = DecompLs2}.
     
 init_eliza(FullPath) ->
     case import_script(FullPath) of
         {ok, ScriptLs} -> extract_and_init_script(ScriptLs);
         Err -> Err
     end.   
+
+write_words(WordLs) ->
+    io:format("Eliza: ~s~n",[string:join(WordLs, " ")]).
+
+read() ->
+    io:get_line("  I  : ").
+talking() ->
+    {Initial, Final, QuitLs, PreLs, PostLs, _SynonLs, KeyLs} = 
+        init_eliza("./script"),
+    write_words(Initial#initial.init_word_list), 
+    talking_loop(Final, QuitLs, PreLs, PostLs, KeyLs).
+
+talking_loop(Final, QuitLs, PreLs, PostLs, KeyLs) ->
+    Sentence = read(),
+    Words = string:tokens(Sentence, " \n"),
+    case quit_check(Words, QuitLs) of
+        true -> 
+            write_words(Final#final.final_word_list),
+            halt();
+        false ->  
+            {AnswerWords, NewKeyLs} = 
+                produce_answer(Words, PreLs, PostLs, KeyLs),
+            write_words(AnswerWords),
+            talking_loop(Final, QuitLs, PreLs, PostLs, NewKeyLs)
+    end.
+
+quit_check(WordLs, QuitLs) ->
+    QuitWordLs = lists:foldl(fun(Quit, Acc) -> 
+                                 Quit#quit.quit_word_list ++  Acc
+                             end,
+                             [],
+                             QuitLs), 
+    lists:any(fun(Word) -> 
+                  lists:member(Word, 
+                               QuitWordLs) 
+              end,
+              WordLs).  
+
+produce_answer(Words, PreLs, PostLs, KeyLs) ->
+    KeywordLs = collect_sorted_keyword_list(Words, KeyLs),
+    WordsAfterPre = substitution(Words, PreLs),
+    %write_words(WordsAfterPre),
+    {WordsAfterKeyProcess, NewKeyLs}
+        = key_process(WordsAfterPre, KeywordLs, KeyLs, PostLs), 
+    %{substitution(WordsAfterKeyProcess, PostLs), NewKeyLs}.
+    {WordsAfterKeyProcess, NewKeyLs}.
+    
+substitution(WordLs, ReplaceTupleLs) ->
+    lists:foldl(fun(Word, Acc) -> 
+                    case lists:keysearch(Word, 2, ReplaceTupleLs) of
+                         false -> Acc ++ [Word];
+                         {value, Tuple} -> Acc ++ element(3, Tuple)
+                    end
+                end,
+                [], WordLs).
+
+collect_sorted_keyword_list(WordsAfterPre, KeyLs) ->
+    KeywordLs = 
+        lists:foldl(fun(Word, Acc) -> 
+                        case lists:keysearch(Word, 2, KeyLs) of
+                             false -> Acc;
+                             {value, #key{keyword=Word,
+                                             priority=Pri}} ->
+                                      [{Word, Pri} | Acc] end
+                     end,
+                     [], WordsAfterPre),
+    lists:sort(fun({_KeyA, PreA}, {_KeyB, PreB}) ->
+                    PreA > PreB
+               end, KeywordLs).
+                        
+                   
+key_process(WordLs, KeywordLs, KeyLs, PostLs) ->
+    case loop_keywords(KeywordLs, WordLs, KeyLs, PostLs) of
+        nomatch -> loop_keywords([{?XNONE,0}], WordLs, KeyLs, PostLs);
+        {Res, NewKeyLs} -> {Res, NewKeyLs} 
+    end.
+    
+loop_keywords([], _, _, _) ->
+    nomatch;
+loop_keywords([{Keyword, _Pre} | Rest], WordLs, KeyLs, PostLs) ->
+    {value, #key{keyword = Keyword, decomp_list = DecompLs} = Key}  =
+        lists:keysearch(Keyword, 2, KeyLs),
+    case loop_decomp_list(DecompLs, WordLs, [], PostLs) of 
+        {NewWords, NewDecompLs} ->
+            {NewWords, lists:keyreplace(
+                                 Keyword, 2, KeyLs, 
+                                 Key#key{decomp_list = NewDecompLs})};
+        nomatch ->
+            loop_keywords(Rest, WordLs, KeyLs, PostLs) 
+    end.
+
+loop_decomp_list([], _Words, _NewDecompLs, _PostLs) ->
+    nomatch;
+loop_decomp_list([#decomp{pattern = PatternWordLs, 
+                          reasmb_index = Idx,
+                          reasmb_list = ReasmbLs} =  Decomp| Rest], 
+                 Words, NewDecompLs, PostLs) ->
+    case re:run(string:join(Words," "), 
+                string:join(PatternWordLs," "),
+                ?OPTIONS) of
+        nomatch ->
+            loop_decomp_list(Rest, Words, NewDecompLs ++ [Decomp], PostLs);
+        {match, Captured} ->
+            #reasmb{rule = Rule, value = WordLsOrKeyword} = lists:nth(Idx, ReasmbLs),
+            case Rule of
+                 replace -> 
+                     NewWordLs = replace_var(WordLsOrKeyword, Captured, PostLs),
+                     NewIdx = case (Idx+1) > length(ReasmbLs) of
+                                  true -> 1;
+                                  false -> Idx + 1
+                              end,
+                     {NewWordLs, 
+                      NewDecompLs ++ 
+                          [Decomp#decomp{reasmb_index = NewIdx}] ++ 
+                          Rest};
+                 goto -> ["GOTO", "IS","NOT","IMPLEMENTED"]
+             end
+    end.
+        
+replace_var(WordLs, Captured, PostLs) ->
+    replace_var_loop(WordLs, Captured, PostLs, []).
+
+replace_var_loop([], _Captured, _PostLs, NewWordLs) ->
+    NewWordLs;        
+replace_var_loop([Word|Rest], Captured, PostLs, NewWordLs) ->
+    NewWordLs1 = 
+        case re:run(Word, ?VAR, ?OPTIONS) of
+            {match,[[CapIdxStr]]} -> 
+                {CapIdx,_} = string:to_integer(CapIdxStr),
+                [MatchStr] = lists:nth(CapIdx, Captured),
+                MatchWordLs = string:tokens(MatchStr, " "),
+                PostSub = substitution(MatchWordLs, PostLs),
+                NewWordLs ++ PostSub;
+            nomatch -> 
+                NewWordLs ++ [Word]
+        end, 
+    replace_var_loop(Rest, Captured, PostLs, NewWordLs1).
+ 
+
+

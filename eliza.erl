@@ -130,3 +130,5 @@ classify_script([#script{value = #synon{}} = Script | Rest],
 classify_script([#script{value = #key{}} = Script | Rest], 
                 Initial, Final, QuitLs, PreLs, PostLs, SynonLs, KeyLs) ->
     classify_script(Rest, Initial, Final, QuitLs, PreLs, PostLs, SynonLs, [Script | KeyLs]).
+
+
